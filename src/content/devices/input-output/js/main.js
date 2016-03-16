@@ -52,6 +52,8 @@ function gotDevices(deviceInfos) {
   });
 }
 
+navigator.mediaDevices.getUserMedia({video:true});
+
 navigator.mediaDevices.enumerateDevices()
 .then(gotDevices)
 .catch(errorCallback);
