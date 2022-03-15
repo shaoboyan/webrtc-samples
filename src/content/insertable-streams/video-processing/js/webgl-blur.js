@@ -120,6 +120,7 @@ class WebGLBlurTransform { // eslint-disable-line no-unused-vars
     this.frameBuffer2_ = this.createFramebuffer_(this.texture2_);
 
     // Load deeplab model
+    await tf.setBackend('webgpu');
     this.deeplab_ = await tf.loadGraphModel('../../../tfjs-models/deeplab_pascal_1_default_1/model.json');
     console.log('DeepLab model loaded', this.deeplab_);
 
