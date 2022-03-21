@@ -223,7 +223,7 @@ function initUI() {
       if (transformType === 'webgl-background-blur') {
         segmentBackend.innerHTML = 'Segment background by TF.js WebGL backend: ';
       } else if (transformType === 'webgpu-background-blur') {
-        segmentBackend.innerHTML = 'Segment background by WebNN: ';
+        segmentBackend.innerHTML = 'Segment background by WebNN polyfill (TF.js WebGPU backend): ';
       }
     } else {
       segmentBackgroundSpan.style.display = "none";

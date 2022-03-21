@@ -53,7 +53,7 @@ async function buildConstantByNpy(device, builder, url) {
     typedArray[i] = dataView[`get` + type[0].toUpperCase() + type.substr(1)](
       i * TypedArrayConstructor.BYTES_PER_ELEMENT, littleEndian);
   }
-  return builder.constant({ type, dimensions }, { resource: await createGPUBuffer(device, sizeOfShape(dimensions), typedArray) });
+  return builder.constant({ type, dimensions }, { resource: tf.tensor(typedArray, dimensions) });
 }
 
 // DeepLab V3 MobileNet V2 model with 'nchw' input layout
@@ -73,6 +73,7 @@ class DeepLabV3MNV2Nchw {
     this.device_ = null;
     this.builder_ = null;
     this.graph_ = null;
+    this.polyfill_ = true;
   }
 
   async buildConv_(input, nameArray, activation = 'relu6', options = {}) {
@@ -121,14 +122,14 @@ class DeepLabV3MNV2Nchw {
 
   async init(device) {
     this.device_ = device;
-    if (!navigator.ml) {
+    if (!navigator.ml_polyfill) {
       alert(
         'Failed to detect WebNN. Check that WebNN is supported ' +
         'by your browser and hardware.');
       return false;
     }
-    const context = navigator.ml.createContext(this.device_);
-    this.builder_ = new MLGraphBuilder(context);
+    const context = navigator.ml_polyfill.createContext(this.device_);
+    this.builder_ = new MLGraphBuilderPolyfill(context);
     const strides = [2, 2];
 
     const input = this.builder_.input('input',
@@ -187,12 +188,20 @@ class DeepLabV3MNV2Nchw {
         conv6, {sizes: [65, 65], mode: 'linear'});
     const resample2 = this.builder_.resample2d(
         resample1, {sizes: [513, 513], mode: 'linear'});
-    const argmax = this.builder_.reduceArgMax(resample2, {axes: [1], keepDimensions: false});
-    this.graph_ = this.builder_.build({'output': argmax});
+    // const argmax = this.builder_.reduceArgMax(resample2, {axes: [1], keepDimensions: false});
+    this.graph_ = this.builder_.build({'output': resample2});
     return true;
   }
 
-  async compute(inputGPUBuffer, outputGPUBuffer) {
-    this.graph_.compute({'input': {resource: inputGPUBuffer}}, {'output': {resource: outputGPUBuffer}});
+  async compute(inputTensor) {
+    const outputResource = {resource: null};
+    this.graph_.compute({'input': {resource: inputTensor}}, {'output': outputResource});
+    return outputResource.resource;
+  }
+
+  dispose() {
+    if (this.graph_ !== null && 'dispose' in this.graph_) {
+      this.graph_.dispose();
+    }
   }
 }
