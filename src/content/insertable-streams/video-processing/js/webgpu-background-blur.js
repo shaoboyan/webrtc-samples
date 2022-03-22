@@ -211,8 +211,6 @@ const batch = [4, 4];
     this.segmapBuffer_ = null;
 
     this.deeplab_ = null;
-    this.presentationWidth = 0;
-    this.presentationHeight = 0;
 
     this.blurBackgroundCheckbox_ = (/** @type {!HTMLInputElement} */ (
       document.getElementById('segmentBackground')));
@@ -275,6 +273,9 @@ const batch = [4, 4];
       this.videoFrameCanvas_ = new OffscreenCanvas(1, 1);
       this.videoFrameContext_ = null;
       this.requireSwizzle = presentationFormat === 'bgra8unorm' ? true : false;
+      this.presentationWidth = 0;
+      this.presentationHeight = 0;
+      this.downloadBuffer = null;
     }
     const fullscreenQuadPipeline = device.createRenderPipeline({
       vertex: {
@@ -444,8 +445,12 @@ const batch = [4, 4];
         canvas.width * devicePixelRatio,
         canvas.height * devicePixelRatio,
       ];
-      this.presentationWidth = presentationSize[0];
-      this.presentationHeight = presentationSize[1];
+
+      if (this.enableWorkaroundForGPUMemoryLeak) {
+        this.presentationWidth = presentationSize[0];
+        this.presentationHeight = presentationSize[1];
+      }
+
       const presentationFormat = this.context_.getPreferredFormat(this.adapter_);
       this.context_.configure({
           device: this.device_,
@@ -462,6 +467,13 @@ const batch = [4, 4];
         this.videoFrameCanvas_.width = frameWidth;
         this.videoFrameCanvas_.height = frameHeight;
         this.videoFrameContext_ = this.videoFrameCanvas_.getContext('2d');
+
+        const widthBit = Math.ceil(this.presentationWidth * 4 / 256)
+        const bytesPerRow = widthBit * 256;
+        this.downloadBufferBytesPerRow = bytesPerRow;
+        this.downloadBuffer = device.createBuffer({size: bytesPerRow * this.presentationHeight,
+                                                usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST,
+                                                mappedAtCreation: false});
       }
     }
 
@@ -685,11 +697,6 @@ const batch = [4, 4];
 
     await device.queue.onSubmittedWorkDone();
 
-    const widthBit = Math.ceil(this.presentationWidth * 4 / 256)
-    const bytesPerRow = widthBit * 256;
-    const downloadBuffer = device.createBuffer({size: bytesPerRow * this.presentationHeight,
-                                                usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST,
-                                                mappedAtCreation: false});
 
     const encoder = device.createCommandEncoder();
     encoder.copyTextureToBuffer(
@@ -697,8 +704,8 @@ const batch = [4, 4];
         texture: this.context_.getCurrentTexture()
       },
       {
-        buffer: downloadBuffer,
-        bytesPerRow: bytesPerRow,
+        buffer: this.downloadBuffer,
+        bytesPerRow: this.downloadBufferBytesPerRow,
         rowsPerImage: this.presentationHeight
       },
       {
@@ -710,8 +717,8 @@ const batch = [4, 4];
     await device.queue.onSubmittedWorkDone();
 
     if (this.enableWorkaroundForGPUMemoryLeak) {
-      await downloadBuffer.mapAsync(GPUMapMode.READ);
-      const content = new Uint8ClampedArray(downloadBuffer.getMappedRange());
+      await this.downloadBuffer.mapAsync(GPUMapMode.READ);
+      const content = new Uint8ClampedArray(this.downloadBuffer.getMappedRange());
 
       let imageDataContent;
 
@@ -733,8 +740,7 @@ const batch = [4, 4];
       const imageData = new ImageData(imageDataContent, this.presentationWidth, this.presentationHeight);
       const finalImage = await createImageBitmap(imageData);
       this.videoFrameContext_.drawImage(finalImage, 0, 0);
-      downloadBuffer.unmap();
-      downloadBuffer.destroy();
+      this.downloadBuffer.unmap();
       finalImage.close();
     }
 
