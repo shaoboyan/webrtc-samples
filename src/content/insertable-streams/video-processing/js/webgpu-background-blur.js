@@ -202,7 +202,7 @@ const batch = [4, 4];
     this.adapter_ = null;
 
     this.blurSettings_ = {
-      filterSize: 10,
+      filterSize: 15,
       iterations: 2,
     };
     this.segmentationWidth_ = 513;
