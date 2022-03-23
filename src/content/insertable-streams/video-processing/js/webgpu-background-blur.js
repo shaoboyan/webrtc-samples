@@ -213,6 +213,8 @@ const batch = [4, 4];
 
     this.blurBackgroundCheckbox_ = (/** @type {!HTMLInputElement} */ (
       document.getElementById('segmentBackground')));
+
+    this.gui_ = null;
   }
 
   /** @override */
@@ -343,6 +345,25 @@ const batch = [4, 4];
     });
     this.computeConstants_ = computeConstants;
 
+    const settings = this.blurSettings_;
+    let blockDim;
+    const updateSettings = () => {
+      blockDim = tileDim - (settings.filterSize - 1);
+      device.queue.writeBuffer(
+        blurParamsBuffer,
+        0,
+        new Uint32Array([settings.filterSize, blockDim])
+      );
+    };
+    if (this.gui_) {
+      this.gui_.destroy();
+    }
+    this.gui_ = new dat.GUI();
+    this.gui_.add(settings, 'filterSize', 1, 33).step(2).onChange(updateSettings);
+    this.gui_.add(settings, 'iterations', 1, 10).step(1);
+
+    updateSettings();
+
     const segmentationInputTexture = device.createTexture({
       size: [this.segmentationWidth_, this.segmentationHeight_, 1],
       format: 'rgba8unorm',
@@ -370,15 +391,6 @@ const batch = [4, 4];
       return buffer;
     })();
     this.segmapBuffer_ = segmapBuffer;
-
-    const settings = this.blurSettings_;
-
-    const blockDim = tileDim - (settings.filterSize - 1);
-    device.queue.writeBuffer(
-      blurParamsBuffer,
-      0,
-      new Uint32Array([settings.filterSize, blockDim])
-    );
 
     console.log(
         '[WebGPUBackgroundBlurTransform] WebGPU initialized.', `${this.debugPath_}.canvas_ =`,
@@ -677,5 +689,7 @@ const batch = [4, 4];
       this.device_ = null;
     }
     this.deeplab_ = null;
+    this.gui_.destroy();
+    this.gui_ = null;
   }
 }
