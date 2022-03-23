@@ -9,16 +9,16 @@
 'use strict';
 
 const preprocessWGSL = `
-[[block]] struct Tensor {
+struct Tensor {
   values: array<f32>;
 };
 
-[[group(0), binding(0)]] var samp : sampler;
-[[group(0), binding(1)]] var<storage, write> inputTensor : Tensor;
-[[group(0), binding(2)]] var inputTex : texture_2d<f32>;
+@group(0) @binding(0) var samp : sampler;
+@group(0) @binding(1) var<storage, write> inputTensor : Tensor;
+@group(0) @binding(2) var inputTex : texture_2d<f32>;
 
-[[stage(compute), workgroup_size(8, 8)]]
-fn main([[builtin(global_invocation_id)]] globalID : vec3<u32>) {
+@stage(compute) @workgroup_size(8, 8)
+fn main(@builtin(global_invocation_id) globalID : vec3<u32>) {
   let dims : vec2<i32> = textureDimensions(inputTex, 0);
   var inputValue = textureSampleLevel(inputTex, samp, vec2<f32>(globalID.xy) / vec2<f32>(dims), 0.0).rgb;
   var normalizedInput = (inputValue * vec3<f32>(255.0, 255.0, 255.0) - vec3<f32>(127.5, 127.5, 127.5)) / vec3<f32>(127.5, 127.5, 127.5);
@@ -31,18 +31,18 @@ fn main([[builtin(global_invocation_id)]] globalID : vec3<u32>) {
 `;
 
 const segmentationWGSL = `
-[[block]] struct SegMap {
+struct SegMap {
   labels: array<i32>;
 };
 
-[[group(0), binding(0)]] var samp : sampler;
-[[group(0), binding(1)]] var<storage, read> segmap : SegMap;
-[[group(0), binding(2)]] var inputTex : texture_2d<f32>;
-[[group(0), binding(3)]] var blurredInputTex : texture_2d<f32>;
-[[group(0), binding(4)]] var outputTex : texture_storage_2d<rgba8unorm, write>;
+@group(0) @binding(0) var samp : sampler;
+@group(0) @binding(1) var<storage, read> segmap : SegMap;
+@group(0) @binding(2) var inputTex : texture_2d<f32>;
+@group(0) @binding(3) var blurredInputTex : texture_2d<f32>;
+@group(0) @binding(4) var outputTex : texture_storage_2d<rgba8unorm, write>;
 
-[[stage(compute), workgroup_size(8, 8)]]
-fn main([[builtin(global_invocation_id)]] globalID : vec3<u32>) {
+@stage(compute) @workgroup_size(8, 8)
+fn main(@builtin(global_invocation_id) globalID : vec3<u32>) {
   let dims : vec2<i32> = textureDimensions(inputTex, 0);
   
   var input = textureSampleLevel(inputTex, samp, vec2<f32>(globalID.xy) / vec2<f32>(dims), 0.0).rgb;
@@ -60,20 +60,20 @@ fn main([[builtin(global_invocation_id)]] globalID : vec3<u32>) {
 `;
 
 const blurWGSL = `
-[[block]] struct Params {
+struct Params {
   filterDim : u32;
   blockDim : u32;
 };
 
-[[group(0), binding(0)]] var samp : sampler;
-[[group(0), binding(1)]] var<uniform> params : Params;
-[[group(1), binding(1)]] var inputTex : texture_2d<f32>;
-[[group(1), binding(2)]] var outputTex : texture_storage_2d<rgba8unorm, write>;
+@group(0) @binding(0) var samp : sampler;
+@group(0) @binding(1) var<uniform> params : Params;
+@group(1) @binding(1) var inputTex : texture_2d<f32>;
+@group(1) @binding(2) var outputTex : texture_storage_2d<rgba8unorm, write>;
 
-[[block]] struct Flip {
+struct Flip {
   value : u32;
 };
-[[group(1), binding(3)]] var<uniform> flip : Flip;
+@group(1) @binding(3) var<uniform> flip : Flip;
 
 // This shader blurs the input texture in one direction, depending on whether
 // |flip.value| is 0 or 1.
@@ -91,10 +91,10 @@ const blurWGSL = `
 
 var<workgroup> tile : array<array<vec3<f32>, 128>, 4>;
 
-[[stage(compute), workgroup_size(32, 1, 1)]]
+@stage(compute) @workgroup_size(32, 1, 1)
 fn main(
-  [[builtin(workgroup_id)]] WorkGroupID : vec3<u32>,
-  [[builtin(local_invocation_id)]] LocalInvocationID : vec3<u32>
+  @builtin(workgroup_id) WorkGroupID : vec3<u32>,
+  @builtin(local_invocation_id) LocalInvocationID : vec3<u32>
 ) {
   let filterOffset : u32 = (params.filterDim - 1u) / 2u;
   let dims : vec2<i32> = textureDimensions(inputTex, 0);
@@ -143,16 +143,16 @@ fn main(
 `;
 
 const fullscreenTexturedQuadWGSL = `
-[[group(0), binding(0)]] var mySampler : sampler;
-[[group(0), binding(1)]] var myTexture : texture_2d<f32>;
+@group(0) @binding(0) var mySampler : sampler;
+@group(0) @binding(1) var myTexture : texture_2d<f32>;
 
 struct VertexOutput {
-  [[builtin(position)]] Position : vec4<f32>;
-  [[location(0)]] fragUV : vec2<f32>;
+  @builtin(position) Position : vec4<f32>;
+  @location(0) fragUV : vec2<f32>;
 };
 
-[[stage(vertex)]]
-fn vert_main([[builtin(vertex_index)]] VertexIndex : u32) -> VertexOutput {
+@stage(vertex)
+fn vert_main(@builtin(vertex_index) VertexIndex : u32) -> VertexOutput {
   var pos = array<vec2<f32>, 6>(
       vec2<f32>( 1.0,  1.0),
       vec2<f32>( 1.0, -1.0),
@@ -175,8 +175,8 @@ fn vert_main([[builtin(vertex_index)]] VertexIndex : u32) -> VertexOutput {
   return output;
 }
 
-[[stage(fragment)]]
-fn frag_main([[location(0)]] fragUV : vec2<f32>) -> [[location(0)]] vec4<f32> {
+@stage(fragment)
+fn frag_main(@location(0) fragUV : vec2<f32>) -> @location(0) vec4<f32> {
   return textureSample(myTexture, mySampler, fragUV);
 }
 `;
@@ -203,7 +203,7 @@ const batch = [4, 4];
     this.adapter_ = null;
 
     this.blurSettings_ = {
-      filterSize: 10,
+      filterSize: 15,
       iterations: 2,
     };
     this.segmentationWidth_ = 513;
@@ -214,6 +214,8 @@ const batch = [4, 4];
 
     this.blurBackgroundCheckbox_ = (/** @type {!HTMLInputElement} */ (
       document.getElementById('segmentBackground')));
+
+    this.gui_ = null;
   }
 
   /** @override */
@@ -353,6 +355,25 @@ const batch = [4, 4];
     });
     this.computeConstants_ = computeConstants;
 
+    const settings = this.blurSettings_;
+    let blockDim;
+    const updateSettings = () => {
+      blockDim = tileDim - (settings.filterSize - 1);
+      device.queue.writeBuffer(
+        blurParamsBuffer,
+        0,
+        new Uint32Array([settings.filterSize, blockDim])
+      );
+    };
+    if (this.gui_) {
+      this.gui_.destroy();
+    }
+    this.gui_ = new dat.GUI();
+    this.gui_.add(settings, 'filterSize', 1, 33).step(2).onChange(updateSettings);
+    this.gui_.add(settings, 'iterations', 1, 10).step(1);
+
+    updateSettings();
+
     const segmentationInputTexture = device.createTexture({
       size: [this.segmentationWidth_, this.segmentationHeight_, 1],
       format: 'rgba8unorm',
@@ -380,15 +401,6 @@ const batch = [4, 4];
       return buffer;
     })();
     this.segmapBuffer_ = segmapBuffer;
-
-    const settings = this.blurSettings_;
-
-    const blockDim = tileDim - (settings.filterSize - 1);
-    device.queue.writeBuffer(
-      blurParamsBuffer,
-      0,
-      new Uint32Array([settings.filterSize, blockDim])
-    );
 
     console.log(
         '[WebGPUBackgroundBlurTransform] WebGPU initialized.', `${this.debugPath_}.canvas_ =`,
@@ -663,13 +675,14 @@ const batch = [4, 4];
       );
     }
 
-    computePass.endPass();
+    computePass.end();
 
     const passEncoder = commandEncoder.beginRenderPass({
       colorAttachments: [
         {
           view: this.context_.getCurrentTexture().createView(),
-          loadValue: { r: 0.0, g: 0.0, b: 0.0, a: 1.0 },
+          clearValue: { r: 0.0, g: 0.0, b: 0.0, a: 1.0 },
+          loadOp: 'clear',
           storeOp: 'store',
         },
       ],
@@ -692,7 +705,7 @@ const batch = [4, 4];
     passEncoder.setPipeline(this.fullscreenQuadPipeline_);
     passEncoder.setBindGroup(0, showResultBindGroup);
     passEncoder.draw(6, 1, 0, 0);
-    passEncoder.endPass();
+    passEncoder.end();
     device.queue.submit([commandEncoder.finish()]);
 
     await device.queue.onSubmittedWorkDone();
@@ -760,5 +773,7 @@ const batch = [4, 4];
       this.device_ = null;
     }
     this.deeplab_ = null;
+    this.gui_.destroy();
+    this.gui_ = null;
   }
 }
